@@ -1,21 +1,12 @@
 package com.shaposhnyk.graphql.genericdb
 
 import graphql.Scalars
-import graphql.language.FieldDefinition
-import graphql.language.ListType
-import graphql.language.ObjectTypeDefinition
-import graphql.language.TypeName
 import graphql.schema.*
-import graphql.schema.idl.TypeDefinitionRegistry
 import org.springframework.boot.CommandLineRunner
 import org.springframework.boot.SpringApplication
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.context.annotation.Bean
-import org.springframework.ldap.NamingException
-import org.springframework.ldap.core.AttributesMapper
 import org.springframework.ldap.core.LdapTemplate
-import org.springframework.ldap.query.ContainerCriteria
-import org.springframework.ldap.query.LdapQueryBuilder.query
 import java.util.stream.Collectors
 import javax.naming.directory.Attributes
 
@@ -23,136 +14,90 @@ import javax.naming.directory.Attributes
 @SpringBootApplication
 class Application {
 
-    /**
-     * Retrieves all the persons in the ldap server
-     * @return list with person names
-     */
-    fun groupList(ldapTemplate: LdapTemplate, userDn: String): List<Attributes> {
-        val criteria: ContainerCriteria = query().where("objectclass").`is`("groupOfUniqueNames")
-                .and("uniqueMember").not().`is`(userDn)
-        return ldapTemplate!!.search(
-                criteria
-                ,
-                object : AttributesMapper<Attributes> {
-                    @Throws(NamingException::class)
-                    override fun mapFromAttributes(attrs: Attributes): Attributes {
-                        return attrs
-                    }
-                })
-    }
-
-    /**
-     * Retrieves all the persons in the ldap server
-     * @return list with person names
-     */
-    fun userList(ldapTemplate: LdapTemplate): List<Attributes> {
-        return ldapTemplate!!.search(
-                query().where("objectclass").`is`("person"),
-                object : AttributesMapper<Attributes> {
-                    @Throws(NamingException::class)
-                    override fun mapFromAttributes(attrs: Attributes): Attributes {
-                        return attrs
-                    }
-                })
-    }
-
     @Bean
     fun init(ldapTemplate: LdapTemplate) = CommandLineRunner {
         println("Hello Boot")
-        println("people " + userList(ldapTemplate).stream()
-                .map { it -> it.get("cn").toString() }
+        println("people " + LdapFetcher.with(ldapTemplate)
+                .ofObjectClass("people")
+                .fetch()
+                .stream()
+                .map { it.get("cn").toString() }
                 .collect(Collectors.toList()))
     }
 
     @Bean
     fun schema(ldapTemplate: LdapTemplate): GraphQLSchema {
-        val queryType = ObjectTypeDefinition("Query")
-        queryType.fieldDefinitions.add(FieldDefinition("applications", ListType(TypeName("application"))))
+        val queryBuilder = GraphQLObjectType.newObject().name("Query")
+                .field(rootList("application") { listOf("appFirst", "appSecond", "appGUI") })
+                .field(rootList("people", "person") {
+                    LdapFetcher.with(ldapTemplate)
+                            .ofObjectClass("person")
+                            .fetch()
+                })
 
-        val appType = ObjectTypeDefinition("application")
-        appType.fieldDefinitions.add(FieldDefinition("id", TypeName("String")))
-        appType.fieldDefinitions.add(FieldDefinition("name", TypeName("String")))
+        val appBuilder: GraphQLType = GraphQLObjectType.newObject().name("application")
+                .field(staticField("id", String::toUpperCase))
+                .field(staticField("name"))
+                .build()
 
-        val typeRegistry = TypeDefinitionRegistry()
-        typeRegistry.add(queryType)
-        typeRegistry.add(appType)
+        val groupBuilder: GraphQLType = GraphQLObjectType.newObject().name("group")
+                .field(ldapField("id", "dn") { it.toUpperCase() })
+                .field(ldapField("name", "cn"))
+                .build()
 
-        val queryBuilder = GraphQLObjectType.newObject()
-                .name("Query")
-                .field(GraphQLFieldDefinition.newFieldDefinition()
-                        .name("applications")
-                        .type(GraphQLList.list(GraphQLTypeReference("application")))
-                        .dataFetcher { _ -> listOf("appFirst", "appSecond", "appGUI") }
-                )
-                .field(GraphQLFieldDefinition.newFieldDefinition()
-                        .name("people")
-                        .type(GraphQLList.list(GraphQLTypeReference("person")))
-                        .dataFetcher { _ ->
-                            LdapFetcher.with(ldapTemplate)
-                                    .ofObjectClass("person")
-                                    .fetch()
-                        }
-                )
-
-        val appBuilder: GraphQLType = GraphQLObjectType.newObject()
-                .name("application")
-                .field(GraphQLFieldDefinition.newFieldDefinition()
-                        .name("id")
-                        .type(Scalars.GraphQLString)
-                        .dataFetcher { env -> (env.getSource() as String).toUpperCase() }
-                )
-                .field(GraphQLFieldDefinition.newFieldDefinition()
-                        .name("name")
-                        .type(Scalars.GraphQLString)
-                        .dataFetcher { env -> env.getSource() as String }
-                ).build()
-
-        val groupBuilder: GraphQLType = GraphQLObjectType.newObject()
-                .name("group")
-                .field(GraphQLFieldDefinition.newFieldDefinition()
-                        .name("id")
-                        .type(Scalars.GraphQLString)
-                        .dataFetcher { env -> (env.getSource() as Attributes).get("dn").get() as String }
-                )
-                .field(GraphQLFieldDefinition.newFieldDefinition()
-                        .name("name")
-                        .type(Scalars.GraphQLString)
-                        .dataFetcher { env -> (env.getSource() as Attributes).get("cn").get() as String }
-                ).build()
-
-        val personBuilder: GraphQLType = GraphQLObjectType.newObject()
-                .name("person")
-                .field(GraphQLFieldDefinition.newFieldDefinition()
-                        .name("id")
-                        .type(Scalars.GraphQLString)
-                        .dataFetcher { env -> (env.getSource() as Attributes).get("dn").get() as String }
-                )
-                .field(GraphQLFieldDefinition.newFieldDefinition()
-                        .name("login")
-                        .type(Scalars.GraphQLString)
-                        .dataFetcher { env -> (env.getSource() as Attributes).get("sn").get() as String }
-                )
-                .field(GraphQLFieldDefinition.newFieldDefinition()
-                        .name("name")
-                        .type(Scalars.GraphQLString)
-                        .dataFetcher { env -> (env.getSource() as Attributes).get("cn").get() as String }
-                )
-                .field(GraphQLFieldDefinition.newFieldDefinition()
-                        .name("groups")
-                        .type(GraphQLList.list(GraphQLTypeReference("group")))
-                        .dataFetcher { env ->
-                            val login = ((env.getSource() as Attributes).get("sn").get() as String);
-                            LdapFetcher.with(ldapTemplate)
-                                    .ofObjectClass("groupOfUniqueNames")
-                                    .filter("uniqueMember", "uid=${login},ou=people,dc=shaposhnyk,dc=com")
-                                    .fetch()
-                        }
+        val personBuilder: GraphQLType = GraphQLObjectType.newObject().name("person")
+                .field(ldapField("id", "dn"))
+                .field(ldapField("login", "sn"))
+                .field(ldapField("name", "cn"))
+                .field(ldapList("group") { attrs ->
+                    val login = attrs.get("sn").get() as String
+                    LdapFetcher.with(ldapTemplate)
+                            .ofObjectClass("groupOfUniqueNames")
+                            .filter("uniqueMember", "uid=${login},ou=people,dc=shaposhnyk,dc=com")
+                            .fetch()
+                }
                 ).build()
 
         return GraphQLSchema.newSchema()
                 .query(queryBuilder)
                 .build(mutableSetOf(appBuilder, personBuilder, groupBuilder))
     }
+
+    /*
+     * Helper methods
+     */
+
+    private fun ldapList(entitySingular: String, extractor: (Attributes) -> Any) = GraphQLFieldDefinition.newFieldDefinition()
+            .name("${entitySingular}s")
+            .type(GraphQLList.list(GraphQLTypeReference(entitySingular)))
+            .dataFetcher { env -> extractor(env.getSource() as Attributes) }
+            .build()
+
+    private fun ldapField(extName: String, intName: String) = ldapField(extName, intName) { it }
+
+    private fun ldapField(extName: String, intName: String, extractor: (String) -> String) = GraphQLFieldDefinition.newFieldDefinition()
+            .name(extName)
+            .type(Scalars.GraphQLString)
+            .dataFetcher { env -> extractor((env.getSource() as Attributes).get(intName).get() as String) }
+            .build()
+
+    private fun staticField(extName: String) = staticField(extName) { it }
+
+    private fun staticField(extName: String, extractor: (String) -> String) = GraphQLFieldDefinition.newFieldDefinition()
+            .name(extName)
+            .type(Scalars.GraphQLString)
+            .dataFetcher { env -> extractor(env.getSource() as String) }
+
+    private fun rootList(entityPlural: String, entitySingular: String, fetcher: () -> Any): GraphQLFieldDefinition {
+        return GraphQLFieldDefinition.newFieldDefinition()
+                .name(entityPlural)
+                .type(GraphQLList.list(GraphQLTypeReference(entitySingular)))
+                .dataFetcher { env -> fetcher() }
+                .build()
+    }
+
+    private fun rootList(entity: String, fetcher: () -> Any)
+            = rootList("${entity}s", entity, fetcher)
 }
 
 fun main(args: Array<String>) {

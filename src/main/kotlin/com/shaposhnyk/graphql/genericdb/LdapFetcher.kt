@@ -15,7 +15,7 @@ class LdapFetcher(private val template: LdapTemplate,
 
     fun ofObjectClass(objectClass: String) = filter("objectclass", objectClass)
 
-    override fun filter(filterName: String, value: String): SimpleFetcherBuilder {
+    override fun filter(filterName: String, value: String): LdapFetcher {
         if (query is ContainerCriteria) {
             return LdapFetcher(template, query.and(filterName).`is`(value))
         } else if (query is LdapQueryBuilder) {
@@ -24,7 +24,7 @@ class LdapFetcher(private val template: LdapTemplate,
         return LdapFetcher(template, LdapQueryBuilder.query().where(filterName).`is`(value))
     }
 
-    override fun attributes(fields: Collection<String>): SimpleFetcherBuilder {
+    override fun attributes(fields: Collection<String>): LdapFetcher {
         val arr = fields.toTypedArray()
         val q = (query as? LdapQueryBuilder ?: LdapQueryBuilder.query())
                 .attributes(*arr)

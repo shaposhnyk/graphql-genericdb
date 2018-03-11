@@ -53,8 +53,13 @@ java.lang.ClassCastException: com.shaposhnyk.graphql.genericdb.LdapFetcher canno
 
 
 ## Pros
+- easy to understand code on high-level
+- easy to write code (for someone familiar with GraphQL)
 - minimize transferred data
 - automatic schema generation
+- easy async fetchers
 
 ## Open questions
 - how to cache effectively data. fragments?
+- pool management to avoid deadlocks?
+- object level post processors?
