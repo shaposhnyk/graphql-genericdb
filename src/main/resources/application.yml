@@ -1,6 +1,18 @@
 spring:
   application:
     name: graphql-genericdb
+
+  ldap:
+    embedded:
+      base-dn: dc=shaposhnyk,dc=com
+      credential:
+        username: uid=admin
+        password: secret
+      ldif: classpath:schema.ldif
+      port: 0
+      validation:
+        enabled: false
+
 server:
   port: 9900
 
