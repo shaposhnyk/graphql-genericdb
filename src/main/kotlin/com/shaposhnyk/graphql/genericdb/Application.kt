@@ -2,6 +2,7 @@ package com.shaposhnyk.graphql.genericdb
 
 import graphql.Scalars
 import graphql.schema.*
+import org.slf4j.LoggerFactory
 import org.springframework.boot.CommandLineRunner
 import org.springframework.boot.SpringApplication
 import org.springframework.boot.autoconfigure.SpringBootApplication
@@ -29,8 +30,11 @@ class Application {
     fun schema(ldapTemplate: LdapTemplate): GraphQLSchema {
         val queryBuilder = GraphQLObjectType.newObject().name("Query")
                 .field(rootList("application") { listOf("appFirst", "appSecond", "appGUI") })
-                .field(rootList("people", "person") {
+                .field(ldapList("people", "person", "person") { env ->
+                    val fields = selectedFields(env)
+                    log.info("Selecting fields on people: {}", fields)
                     LdapFetcher.with(ldapTemplate)
+                            .attributes(fields)
                             .ofObjectClass("person")
                             .fetch()
                 })
@@ -49,9 +53,12 @@ class Application {
                 .field(ldapField("id", "dn"))
                 .field(ldapField("login", "sn"))
                 .field(ldapField("name", "cn"))
-                .field(ldapList("group") { attrs ->
-                    val login = attrs.get("sn").get() as String
+                .field(ldapList("groups", "group", "groupOfUniqueNames") { env ->
+                    val login = (env.getSource() as Attributes).get("sn").get() as String
+                    val fields = selectedFields(env)
+                    log.info("Selecting fields on group: {}", fields)
                     LdapFetcher.with(ldapTemplate)
+                            .attributes(fields)
                             .ofObjectClass("groupOfUniqueNames")
                             .filter("uniqueMember", "uid=${login},ou=people,dc=shaposhnyk,dc=com")
                             .fetch()
@@ -67,19 +74,38 @@ class Application {
      * Helper methods
      */
 
-    private fun ldapList(entitySingular: String, extractor: (Attributes) -> Any) = GraphQLFieldDefinition.newFieldDefinition()
-            .name("${entitySingular}s")
-            .type(GraphQLList.list(GraphQLTypeReference(entitySingular)))
-            .dataFetcher { env -> extractor(env.getSource() as Attributes) }
-            .build()
+    /**
+     * Extract internalField names by external fieldNames
+     * @param env - data fetching environment
+     */
+    private fun selectedFields(env: DataFetchingEnvironment): Collection<String> {
+        return env.selectionSet.get().keys
+                .map { k ->
+                    ((env.fieldDefinition.type as GraphQLList)
+                            .wrappedType as GraphQLObjectType)
+                            .getFieldDefinition(k)
+                }
+                .filter { it is MappingFieldDefinition }
+                .map { (it as MappingFieldDefinition).intName }
+    }
+
+    private fun ldapList(entityPlural: String, entitySingular: String, intName: String,
+                         fetcher: (DataFetchingEnvironment) -> Any): GraphQLFieldDefinition {
+        return MappingFieldDefinition.of(intName, GraphQLFieldDefinition.newFieldDefinition()
+                .name(entityPlural)
+                .type(GraphQLList.list(GraphQLTypeReference(entitySingular)))
+                .dataFetcher(fetcher)
+                .build())
+    }
 
     private fun ldapField(extName: String, intName: String) = ldapField(extName, intName) { it }
 
-    private fun ldapField(extName: String, intName: String, extractor: (String) -> String) = GraphQLFieldDefinition.newFieldDefinition()
-            .name(extName)
-            .type(Scalars.GraphQLString)
-            .dataFetcher { env -> extractor((env.getSource() as Attributes).get(intName).get() as String) }
-            .build()
+    private fun ldapField(extName: String, intName: String, extractor: (String) -> String) = MappingFieldDefinition.of(intName,
+            GraphQLFieldDefinition.newFieldDefinition()
+                    .name(extName)
+                    .type(Scalars.GraphQLString)
+                    .dataFetcher { env -> extractor((env.getSource() as Attributes).get(intName).get() as String) }
+                    .build())
 
     private fun staticField(extName: String) = staticField(extName) { it }
 
@@ -98,6 +124,10 @@ class Application {
 
     private fun rootList(entity: String, fetcher: () -> Any)
             = rootList("${entity}s", entity, fetcher)
+
+    companion object {
+        val log = LoggerFactory.getLogger(this::class.java)
+    }
 }
 
 fun main(args: Array<String>) {
