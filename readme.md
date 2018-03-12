@@ -4,9 +4,9 @@ Generic GraphQL application with programmaticly generated schema, to be used wit
 ## Motivations
 - make prof of concept of generic GraphQL application with programmatic schema, which can be used with databases and external providers, which allows clients to specify data columns to select
 - overcome lack of documentation, as documentation on graphql-java and most of examples focus on bean classes use-case
--- both docs/tutorials mentioned on graphql-java focus on bean classes use-case
--- graphql-java-db-example reads schema from a file
--- graphql-java project is developing fast and documentation is quite outdated (v3 documented, while v7 released)
+    - both docs/tutorials mentioned on graphql-java focus on bean classes use-case
+    - graphql-java-db-example reads schema from a file
+    - graphql-java project is developing fast and documentation is quite outdated (v3 documented, while v7 released)
 
 ## Goals
 - easy-to-understand high-level code
