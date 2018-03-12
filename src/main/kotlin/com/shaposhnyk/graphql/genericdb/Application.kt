@@ -35,18 +35,22 @@ class Application {
                     log.info("Selecting fields on people: {}", fields)
                     LdapFetcher.with(ldapTemplate)
                             .attributes(fields)
+                            .offsetAndLimit(env.arguments["offset"] as Int, env.arguments["limit"] as Int)
                             .ofObjectClass("person")
                             .fetch()
-                })
+                }).description("Unified Enterprise Data API")
+                .build()
 
         val appBuilder: GraphQLType = GraphQLObjectType.newObject().name("application")
                 .field(staticField("id", String::toUpperCase))
                 .field(staticField("name"))
+                .description("CMDB Application")
                 .build()
 
         val groupBuilder: GraphQLType = GraphQLObjectType.newObject().name("group")
                 .field(ldapField("id", "dn") { it.toUpperCase() })
                 .field(ldapField("name", "cn"))
+                .description("LDAP Group")
                 .build()
 
         val personBuilder: GraphQLType = GraphQLObjectType.newObject().name("person")
@@ -59,11 +63,13 @@ class Application {
                     log.info("Selecting fields on group: {}", fields)
                     LdapFetcher.with(ldapTemplate)
                             .attributes(fields)
+                            .offsetAndLimit(env.arguments["offset"] as Int, env.arguments["limit"] as Int)
                             .ofObjectClass("groupOfUniqueNames")
                             .filter("uniqueMember", "uid=${login},ou=people,dc=shaposhnyk,dc=com")
                             .fetch()
                 }
-                ).build()
+                ).description("LDAP Person")
+                .build()
 
         return GraphQLSchema.newSchema()
                 .query(queryBuilder)
@@ -95,6 +101,13 @@ class Application {
                 .name(entityPlural)
                 .type(GraphQLList.list(GraphQLTypeReference(entitySingular)))
                 .dataFetcher(fetcher)
+                .argument(GraphQLArgument.newArgument()
+                        .name("limit").type(Scalars.GraphQLInt)
+                        .defaultValue(100))
+                .argument(GraphQLArgument.newArgument()
+                        .name("offset").type(Scalars.GraphQLInt)
+                        .defaultValue(0))
+                .description("Paginated list of ${entityPlural}")
                 .build())
     }
 
@@ -119,6 +132,7 @@ class Application {
                 .name(entityPlural)
                 .type(GraphQLList.list(GraphQLTypeReference(entitySingular)))
                 .dataFetcher { env -> fetcher() }
+                .description("Non-paginated list of ${entityPlural}")
                 .build()
     }
 

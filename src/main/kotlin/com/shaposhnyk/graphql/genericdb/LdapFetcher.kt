@@ -31,6 +31,13 @@ class LdapFetcher(private val template: LdapTemplate,
         return LdapFetcher(template, q)
     }
 
+    override fun offsetAndLimit(offset: Int, limit: Int): LdapFetcher {
+        if (query is LdapQueryBuilder) {
+            return LdapFetcher(template, query.countLimit(limit))
+        }
+        return this;
+    }
+
     override fun fetch(): Collection<Attributes> {
         return template.search(query, mapper)
     }
