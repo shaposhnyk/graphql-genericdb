@@ -25,6 +25,13 @@ Generic GraphQL application with programmaticly generated schema, to be used wit
 - pool management to avoid deadlocks? is it handled?
 - object level post processors?
 
+## How to use
+```
+$ mvn spring-boot:run
+$ start http://localhost:9900/graphiql
+```
+
+
 ## Observations
 
 Non-builder-style object definition code is more compact, than builde-style:
