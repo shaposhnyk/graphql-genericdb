@@ -1,12 +1,33 @@
 # Generic data graphql application
+Generic GraphQL application with programmaticly generated schema, to be used with external third-party providers, which allows clients to specify data columns, like relational and NoSQL databases, JCR (Apache Jackrabbit) or LDAP
 
 ## Motivations
-- documentation from graphql-java repository references GQL v3.0 (current version is 7) and targets "bean" use case
-- another documentation references object builder, but never shows where it can be used.
+- make prof of concept of generic GraphQL application with programmatic schema, which can be used with databases and external providers, which allows clients to specify data columns to select
+- overcome lack of documentation, as documentation on graphql-java and most of examples focus on bean classes use-case
+-- both docs/tutorials mentioned on graphql-java focus on bean classes use-case
+-- graphql-java-db-example reads schema from a file
+-- graphql-java project is developing fast and documentation is quite outdated (v3 documented, while v7 released)
+
+## Goals
+- easy-to-understand high-level code
+```
+        val groupType = newObject("group")
+                .field(ldapField("id", "sn") { it.toUpperCase() })
+                .field(ldapField("name", "cn"))
+```
+- easy-to-write-and-maintain code, for a someone already familiar with GraphQL
+- minimize transferred data
+- generate GraphQL schema automatically
+- easy async fetchers
+
+## Open questions
+- how to cache effectively data? server-side fragments?
+- pool management to avoid deadlocks? is it handled?
+- object level post processors?
 
 ## Observations
 
-Non-builder-style object definition code:
+Non-builder-style object definition code is more compact, than builde-style:
 ```
         val appType = ObjectTypeDefinition("application")
         appType.fieldDefinitions.add(FieldDefinition("id", TypeName("String")))
@@ -51,15 +72,3 @@ java.lang.ClassCastException: com.shaposhnyk.graphql.genericdb.LdapFetcher canno
 	at graphql.execution.AsyncExecutionStrategy.execute(AsyncExecutionStrategy.java:55) ~[graphql-java-6.0.jar:na]
 	at graphql.execution.ExecutionStrategy.completeValue(ExecutionStrategy.java:368) ~[graphql-java-6.0.jar:na]
 
-
-## Pros
-- easy to understand code on high-level
-- easy to write code (for someone familiar with GraphQL)
-- minimize transferred data
-- automatic schema generation
-- easy async fetchers
-
-## Open questions
-- how to cache effectively data. fragments?
-- pool management to avoid deadlocks?
-- object level post processors?
