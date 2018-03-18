@@ -57,7 +57,7 @@ class Application {
                 .field(ldapDn("id") { it })
                 .field(ldapField("login", "sn"))
                 .field(ldapField("name", "cn"))
-                .field(ldapList("groups", "group", "groupOfUniqueNames") { env ->
+                .field(ldapList("groups", "group", listOf("sn", "groupOfUniqueNames")) { env ->
                     val login = (env.getSource() as DirContextAdapter).getStringAttribute("sn")
                     val fields = selectedFields(env)
                     log.info("Selecting fields on group: {}", fields)
@@ -92,12 +92,17 @@ class Application {
                             .getFieldDefinition(k)
                 }
                 .filter { it is MappingFieldDefinition }
-                .map { (it as MappingFieldDefinition).intName }
+                .flatMap { (it as MappingFieldDefinition).intNames }
     }
 
     private fun ldapList(entityPlural: String, entitySingular: String, intName: String,
+                         fetcher: (DataFetchingEnvironment) -> Any) = ldapList(
+            entityPlural, entitySingular,
+            listOf(intName), fetcher)
+
+    private fun ldapList(entityPlural: String, entitySingular: String, intNames: List<String>,
                          fetcher: (DataFetchingEnvironment) -> Any): GraphQLFieldDefinition {
-        return MappingFieldDefinition.of(intName, GraphQLFieldDefinition.newFieldDefinition()
+        return MappingFieldDefinition.ofMulti(intNames, GraphQLFieldDefinition.newFieldDefinition()
                 .name(entityPlural)
                 .type(GraphQLList.list(GraphQLTypeReference(entitySingular)))
                 .dataFetcher(fetcher)

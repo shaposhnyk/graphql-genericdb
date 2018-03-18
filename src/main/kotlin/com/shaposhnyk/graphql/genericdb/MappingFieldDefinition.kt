@@ -8,7 +8,7 @@ import graphql.schema.GraphQLOutputType
 /**
  * Mapping field definition. A field which map internalField to a GraphQLField
  */
-class MappingFieldDefinition(val intName: String,
+class MappingFieldDefinition(val intNames: Iterable<String>,
                              name: String?,
                              description: String?,
                              type: GraphQLOutputType?,
@@ -24,7 +24,7 @@ class MappingFieldDefinition(val intName: String,
 
     companion object {
         fun of(intName: String, f: GraphQLFieldDefinition)
-                = MappingFieldDefinition(intName,
+                = MappingFieldDefinition(listOf(intName),
                 f.name,
                 f.description,
                 f.type,
@@ -32,5 +32,13 @@ class MappingFieldDefinition(val intName: String,
                 f.arguments,
                 f.deprecationReason)
 
+        fun ofMulti(intNames: List<String>, f: GraphQLFieldDefinition)
+                = MappingFieldDefinition(intNames,
+                f.name,
+                f.description,
+                f.type,
+                f.dataFetcher,
+                f.arguments,
+                f.deprecationReason)
     }
 }
