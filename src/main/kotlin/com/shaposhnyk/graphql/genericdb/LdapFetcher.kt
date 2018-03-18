@@ -1,17 +1,17 @@
 package com.shaposhnyk.graphql.genericdb
 
-import org.springframework.ldap.core.AttributesMapper
+import org.springframework.ldap.core.ContextMapper
+import org.springframework.ldap.core.DirContextAdapter
 import org.springframework.ldap.core.LdapTemplate
 import org.springframework.ldap.query.ContainerCriteria
 import org.springframework.ldap.query.LdapQuery
 import org.springframework.ldap.query.LdapQueryBuilder
-import javax.naming.directory.Attributes
 
 
 class LdapFetcher(private val template: LdapTemplate,
                   private val query: LdapQuery = LdapQueryBuilder.query()) : SimpleFetcherBuilder {
 
-    private val mapper = AttributesMapper<Attributes> { attrs -> attrs }
+    private val mapper = ContextMapper<DirContextAdapter> { ctx -> ctx as DirContextAdapter }
 
     fun ofObjectClass(objectClass: String) = filter("objectclass", objectClass)
 
@@ -38,7 +38,7 @@ class LdapFetcher(private val template: LdapTemplate,
         return this;
     }
 
-    override fun fetch(): Collection<Attributes> {
+    override fun fetch(): Collection<DirContextAdapter> {
         return template.search(query, mapper)
     }
 

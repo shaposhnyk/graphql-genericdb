@@ -7,9 +7,9 @@ import org.springframework.boot.CommandLineRunner
 import org.springframework.boot.SpringApplication
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.context.annotation.Bean
+import org.springframework.ldap.core.DirContextAdapter
 import org.springframework.ldap.core.LdapTemplate
 import java.util.stream.Collectors
-import javax.naming.directory.Attributes
 
 
 @SpringBootApplication
@@ -22,7 +22,7 @@ class Application {
                 .ofObjectClass("people")
                 .fetch()
                 .stream()
-                .map { it.get("cn").toString() }
+                .map { it.getStringAttribute("cn") }
                 .collect(Collectors.toList()))
     }
 
@@ -54,11 +54,11 @@ class Application {
                 .build()
 
         val personBuilder: GraphQLType = GraphQLObjectType.newObject().name("person")
-                .field(ldapField("id", "dn"))
+                .field(ldapDn("id") { it })
                 .field(ldapField("login", "sn"))
                 .field(ldapField("name", "cn"))
                 .field(ldapList("groups", "group", "groupOfUniqueNames") { env ->
-                    val login = (env.getSource() as Attributes).get("sn").get() as String
+                    val login = (env.getSource() as DirContextAdapter).getStringAttribute("sn")
                     val fields = selectedFields(env)
                     log.info("Selecting fields on group: {}", fields)
                     LdapFetcher.with(ldapTemplate)
@@ -111,13 +111,20 @@ class Application {
                 .build())
     }
 
+    private fun ldapDn(extName: String, extractor: (String) -> String) = MappingFieldDefinition.of("dn",
+            GraphQLFieldDefinition.newFieldDefinition()
+                    .name(extName)
+                    .type(Scalars.GraphQLString)
+                    .dataFetcher { env -> extractor((env.getSource() as DirContextAdapter).dn.toString()) }
+                    .build())
+
     private fun ldapField(extName: String, intName: String) = ldapField(extName, intName) { it }
 
     private fun ldapField(extName: String, intName: String, extractor: (String) -> String) = MappingFieldDefinition.of(intName,
             GraphQLFieldDefinition.newFieldDefinition()
                     .name(extName)
                     .type(Scalars.GraphQLString)
-                    .dataFetcher { env -> extractor((env.getSource() as Attributes).get(intName).get() as String) }
+                    .dataFetcher { env -> extractor((env.getSource() as DirContextAdapter).getStringAttribute(intName)) }
                     .build())
 
     private fun staticField(extName: String) = staticField(extName) { it }
