@@ -48,7 +48,7 @@ class Application {
                 .build()
 
         val groupBuilder: GraphQLType = GraphQLObjectType.newObject().name("group")
-                .field(ldapField("id", "dn") { it.toUpperCase() })
+                .field(ldapDn("id") { it.toUpperCase() })
                 .field(ldapField("name", "cn"))
                 .description("LDAP Group")
                 .build()
